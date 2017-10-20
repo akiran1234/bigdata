@@ -1,0 +1,89 @@
+Hive offers no support for rowlevel inserts, updates, and deletes.
+set hive.cli.print.header=true; --> To print the cloumn names along withe the data.
+SET hive.exec.dynamic.partition=true; --> To enable dynamic partitions on a table.
+Fetch Task: When you perform a "select * from <tablename>"
+Hive fetches the whole data from file as a FetchTask  rather than a mapreduce task which just dumps the data as it is without doing anything on it. This is similar to "hadoop dfs -text <filename>"
+
+*****DDL Database********
+CREATE DATABASE financials;                          --> Hive will throw an error if financials already exists. You can suppress these warnings with this variation:
+/user/hive/warehouse/financials.db              --> Warehouse is the default directory when ever a database is created.
+CREATE DATABASE IF NOT EXISTS financials; --> IF NOT EXISTS clause is useful for scripts that should create a database onthe-fly.
+SHOW DATABASES; 			    --> To view all the databases in Hive
+SHOW DATABASES LIKE 'h.*';		    -->  Using Regular Expression to fillter Databases (LIKE or RLIKE)
+DROP DATABASE IF EXISTS financials;            --> IF EXISTS is optional and suppresses warnings if financials doesn’t exist.
+DROP DATABASE IF EXISTS financials CASCADE; --> Ideally to drop the DB it shouldn't have the tables. Using cascade will drop all the tables first and then drops the DB. 
+ALTER DATABASE financials SET DBPROPERTIES ('editedby' = 'Kiran');  --> To Alter the Database once it is created.
+
+**********DDL Create Statment****************
+CREATE TABLE IF NOT EXISTS mydb.employees (
+name STRING COMMENT 'Employee name',
+salary FLOAT COMMENT 'Employee salary',
+subordinates ARRAY<STRING> COMMENT 'Names of subordinates',
+deductions MAP<STRING, FLOAT>
+COMMENT 'Keys are deductions names, values are percentages',
+address STRUCT<street:STRING, city:STRING, state:STRING, zip:INT>
+COMMENT 'Home address')
+COMMENT 'Description of the table'
+TBLPROPERTIES ('creator'='me', 'created_at'='2012-01-02 10:00:00', ...)
+PARTITIONED BY (country STRING, state STRING);
+LOCATION '/user/hive/warehouse/mydb.db/employees';
+
+1. IF NOT EXISTS, Hive will silently ignore the statement if the table already exists.
+2. mydb.employees --> Specifing schema will create the table as specified.
+3. Comments can be created in each cloumn level and table level.
+4. Location can be specified for external and managed tables.
+
+describe formatted kiran_tb; --> Will give the complete details of the table along with metadata.
+describe extended kiran_tb; --> Will give the complete details of the table along with metadata.
+
+***********External Tables********
+CREATE EXTERNAL TABLE IF NOT EXISTS stocks (
+exchange STRING,
+symbol STRING,
+ymd STRING,
+price_open FLOAT,
+price_high FLOAT,
+price_low FLOAT,
+price_close FLOAT,
+volume INT,
+price_adj_close FLOAT)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+LOCATION '/data/stocks';
+
+1. External Table clause will create an external table and location of the file will be created in the specified location of the user.
+2. This table will not be created in default warehouse path.
+3. When the table is dropped, Managed table will delete the table and its corresponding file. "External table" only table and its metadata will be dropped but not the file because it can be used by pig or someother scripts.
+
+*********Partitions***********
+show partitions stocks_partition_tb; --> To see the partitions on the table;
+
+CREATE TABLE IF NOT EXISTS kiran_staticp (
+Name STRING,
+symbol STRING
+)
+PARTITIONED BY (ssymb STRING)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ',';
+-----------------------------Loading the Partition Table-----------
+INSERT OVERWRITE TABLE kiran_staticp
+PARTITION (ssymb = 'B7J')
+select exch, symbol from stocks_partition_tb where sym='B7J' limit 10;
+---------Multiple partitions using single insert
+hive> FROM stocks s
+INSERT OVERWRITE TABLE stocks_partition
+PARTITION (sym = 'GEL')
+SELECT * WHERE s.symbol = 'GEL'
+INSERT OVERWRITE TABLE stocks_partition
+PARTITION (sym = 'GEK')
+SELECT * WHERE s.symbol = 'GEK';
+-### DROPPING A PARTITION ###
+ALTER TABLE stocks_partition DROP IF EXISTS PARTITION(sym = 'GEL');
+
+### INCORRECT PARTITION ASSIGNMENT ###
+hive> INSERT OVERWRITE TABLE stocks_partition
+PARTITION (sym = 'APPL')
+SELECT * FROM stocks s
+WHERE s.symbol = 'MSFT'; -- Hive will not care, it's developer's responsibilty to pass the right data.
+
+### ENABLE DYNAMIC PARTITION ###
+SET hive.exec.dynamic.partition=true;
+

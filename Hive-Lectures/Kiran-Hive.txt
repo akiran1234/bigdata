@@ -1,0 +1,73 @@
+***** set hive.execution.engine=tez; // To set tez mode ******
+Executing hadoop commands from hive mode by putting ! --> ! hadoop fs  -ls /testdir1
+*******Creating Databases******
+Create database kirandb; // It will create the db in the default warehouse hdfs path--/user/hive/warehouse/kirandb.db
+use database kirandb; // Now we can create the tables in this kirandb. 
+Note: Default Database-/user/hive/warehouse/   ** If we dont switch to any Db, tables by default will be created in this hdfs path. **
+*******Creating Table********
+// This is managed table by default it will be created in warehouse path.
+CREATE TABLE IF NOT EXISTS emp (    
+id INT,
+ename STRING,
+sal INT,
+dept INT)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+TBLPROPERTIES ('creator'='Kiran', 'created_on' = '2016-10-21', 'description'='Emp Table created by Kiran!!');
+
+// To create a table in specific directory of HDFS but it will be in the same DB.
+CREATE TABLE IF NOT EXISTS emp_temp(    
+id INT,
+ename STRING,
+sal INT,
+dept INT)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+LOCATION '/user/kiranhive/'
+TBLPROPERTIES ('creator'='Kiran', 'created_on' = '2016-10-21', 'description'='Not a default hive Directory');
+
+// Create table from other table
+
+create table copy_emp_temp as select *from emp_temp;  // emp_temp Table path-->/user/kiranhive/  but the copy table will be created in the default directory--> /user/hive/warehouse/kirandb.db/copy_emp_temp
+
+*******Describe the table***************************
+describe emp;                                    // Will display only datatypes of the table.
+describe formatted emp;              // Will give the complete details of the table.
+********Inserting Data into emp*********************
+1. Directly move the emp file with the same structure into this path -- /user/hive/warehouse/kirandb.db/
+2. Using Load command hdfs path // LOAD DATA INPATH '/testdir1/emp.txt' INTO TABLE EMP;  ***This works like mv command moving /testdir1/emp.txt  To /user/hive/warehouse/kirandb.db **
+3. Loading from Local FS                   // LOAD DATA LOCAL INPATH  '/home/cloudera/localtestdir/emp.txt' INTO TABLE EMP; **** But in the Local FS the file emp is copied but not moved.****
+****** Truncating the Data ********
+hadoop fs -rm /user/hive/warehouse/kirandb.db/emp/emp*.txt
+drop table kirandb.emp;                   // This will delete the table and the underlying file from directory.
+****Saving the output of hiveql in local FS**********
+INSERT OVERWRITE LOCAL DIRECTORY '/home/cloudera/localtestdir/' ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' 
+select *from emp;
+******External Table****************
+// The file in the located directory will not be deleted even after droping the hive table.
+CREATE EXTERNAL TABLE IF NOT EXISTS TESTDB.emp(    
+id INT,
+ename STRING,
+sal INT,
+dept INT)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+LOCATION '/user/kiranhive/'
+TBLPROPERTIES ('creator'='Kiran', 'created_on' = '2016-10-21', 'description'='Not a default hive Directory');
+*********** order by  VS sort by  VS distributed  VS cluster by  *********
+order by : Clause will work only with 1 reducer to sort the data across the reducer. Even if after setting the property (SET mapreduce.job.reduces='Any Numeric Value';) it works only with 1 reducer.
+	This order by clause will be a performance bottle neck with huge data sets becasuse it will work only with one reducer. (select *from emp order by dept;)
+sort by : Clause will sort the data across all the reducers. By using the following property we can set the no.of reducers (SET mapreduce.job.reduces=3). This will set 3 reducers. (select *from emp sort by dept;)
+                  The final result will be captured in 3 files as 3 reducers are running. But the problem here is sorted results are distributed across 3 files. So here comes the distributed clause to overcome the issue.
+distributed by: Will distribute the  data across the reducers based on the key column and it will ensure all the identical key column values goes to one reducer.  (select *from emp distribute by dept;)
+	         Select *from emp distribute by dept sort by dept; // This will ensure all the identical dept values goes into one reducer and then data gets sorted and displayed in 3 O/P files.
+	         Note: distribute by always followed by sort by.
+cluster by: clause  functionality is a combination of (distribute by + sort by) clauses.
+********Partitions in Hive******************
+CREATE TABLE IF NOT EXISTS kirandb.part_emp (    
+id INT,
+ename STRING,
+sal INT,
+dept INT)
+PARTITIONED BY (part_dept INT)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+TBLPROPERTIES ('creator'='Kiran', 'created_on' = '2016-10-25', 'description'='Partitioned Emp Table created by Kiran!!');
+
+

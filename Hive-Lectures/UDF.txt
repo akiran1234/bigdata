@@ -1,0 +1,39 @@
+package hiveUDF;
+
+import org.apache.hadoop.hive.ql.exec.UDF;
+import org.apache.hadoop.io.Text;
+
+public final class LowerA extends UDF {
+	public Text evaluate(final Text s) {
+		if (s == null) {
+			return null;
+		}
+		return new Text(s.toString().toLowerCase());
+	}
+}
+
+**********************
+1. Go to Hive CLI and add the Jar file.
+2. ADD JAR /home/user1/Downloads/LowerA.jar;
+3. list jars; ---> To verify the jar is added or not.
+4. create temporary function kiranlower AS 'HiveUDF.LowerA';
+
+5.
+CREATE EXTERNAL TABLE IF NOT EXISTS fleetdata (
+Airline String,
+AircraftType String,
+Currents String,
+Future Int,
+Historic String,
+Total Int,
+Orders Int,
+UnitCost Int,
+TotalCost Int,
+AverageAge Int   
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+LOCATION '/user/kiranhive/'
+TBLPROPERTIES ('creator'='Kiran', 'created_on' = '2017-02-15', 'description'='Table created by Kiran!!',"skip.header.line.count"="1");
+
+6. select Airline, kiranlower(Airline) from fleetdata;
+

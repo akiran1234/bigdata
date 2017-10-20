@@ -1,0 +1,5 @@
+CREATE TABLE kiran(
+  name STRING,
+  color STRING
+) STORED AS ORC;
+## Internally Data will be stored in ORC file format and when describe it will show orc serde (org.apache.hadoop.hive.ql.io.orc.OrcSerde)
